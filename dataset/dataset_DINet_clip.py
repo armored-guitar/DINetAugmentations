@@ -4,6 +4,8 @@ import json
 import random
 import cv2
 
+import albumentations as A
+
 from torch.utils.data import Dataset
 
 
@@ -31,6 +33,22 @@ class DINetDataset(Dataset):
         self.img_w = self.radius * 2 + self.radius_1_4 * 2
         self.length = len(self.data_dic_name_list)
 
+        source_transforms_targets = {f"target_{i}": "image" for i in range(5)}
+        source_transforms_targets.update({f"masked_{i}": "image" for i in range(1,5)})
+        self.source_transforms = A.Compose([
+            A.OneOf([
+                A.ColorJitter(p=0.5),
+                A.RandomBrightnessContrast(p=0.5)
+            ], p=0.5)
+        ], additional_targets=source_transforms_targets)
+        self.reference_transforms = A.Compose([
+            A.OneOf([
+                A.ColorJitter(p=0.5),
+                A.RandomBrightnessContrast(p=0.5)
+            ], p=0.5),
+            A.Flip(p=0.5)
+        ])
+
     def __getitem__(self, index):
         video_name = self.data_dic_name_list[index]
         video_clip_num = len(self.data_dic[video_name]['clip_data_list'])
@@ -43,7 +61,7 @@ class DINetDataset(Dataset):
         for source_frame_index in range(2, 2 + 5):
             ## load source clip
             source_image_data = cv2.imread(source_image_path_list[source_frame_index])[:, :, ::-1]
-            source_image_data = cv2.resize(source_image_data, (self.img_w, self.img_h)) / 255.0
+            source_image_data = cv2.resize(source_image_data, (self.img_w, self.img_h))
             source_clip_list.append(source_image_data)
             source_image_mask = source_image_data.copy()
             source_image_mask[self.radius:self.radius + self.mouth_region_size,
@@ -64,9 +82,16 @@ class DINetDataset(Dataset):
                 reference_random_index = random.sample(range(9), 1)[0]
                 reference_frame_path = reference_frame_path_list[reference_random_index]
                 reference_frame_data = cv2.imread(reference_frame_path)[:, :, ::-1]
-                reference_frame_data = cv2.resize(reference_frame_data, (self.img_w, self.img_h)) / 255.0
+                reference_frame_data = cv2.resize(reference_frame_data, (self.img_w, self.img_h))
+                reference_frame_data = self.reference_transforms(image=reference_frame_data)["image"] / 255.0
                 reference_frame_list.append(reference_frame_data)
             reference_clip_list.append(np.concatenate(reference_frame_list, 2))
+
+        source_transforms_targets = {f"target_{i}": img for i, img in enumerate(source_clip_list)}
+        source_transforms_targets.update({f"masked_{i+1}": img for i, img in enumerate(source_clip_mask_list[1:])})
+        transformed_dict = self.source_transforms(image=source_clip_mask_list[0], **source_transforms_targets)
+        source_clip_list = [transformed_dict[f"target_{i}"] / 255.0 for i in range(5)]
+        source_clip_mask_list = [transformed_dict["image"] / 255.0] + [transformed_dict[f"masked_{i}"] / 255.0 for i in range(1, 5)]
 
         source_clip = np.stack(source_clip_list, 0)
         source_clip_mask = np.stack(source_clip_mask_list, 0)
