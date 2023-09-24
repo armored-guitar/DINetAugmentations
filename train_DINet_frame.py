@@ -28,7 +28,7 @@ if __name__ == "__main__":
     np.random.seed(opt.seed)
     torch.cuda.manual_seed(opt.seed)
     # load training data in memory
-    train_data = DINetDataset(opt.train_data,opt.augment_num,opt.mouth_region_size)
+    train_data = DINetDataset(opt.train_data,opt.augment_num,opt.mouth_region_size, is_fine=opt.coarse2fine)
     training_data_loader = DataLoader(dataset=train_data,  batch_size=opt.batch_size, shuffle=True,drop_last=True)
     train_data_length = len(training_data_loader)
     # init network
