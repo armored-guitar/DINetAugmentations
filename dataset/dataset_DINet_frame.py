@@ -32,31 +32,31 @@ class DINetDataset(Dataset):
         self.img_w = self.radius * 2 + self.radius_1_4 * 2
         self.length = len(self.data_dic_name_list)
 
-        self.source_transforms = A.compose([
+        self.source_transforms = A.Compose([
             A.OneOf([
                 A.ShiftScaleRotate(p=0.3),
                 A.GridDistortion(p=0.3),
                 A.ElasticTransform(p=0.3)
             ], p=0.3 if is_fine else 0.5),
             A.OneOf([
-                ColorJitter(p=0.5),
-                RandomBrightnessContrast(p=0.5)
+                A.ColorJitter(p=0.5),
+                A.RandomBrightnessContrast(p=0.5)
             ], p=0.5)
         ], additional_targets={"masked": "image"})
-        self.reference_transforms = A.compose([
+        self.reference_transforms = A.Compose([
             A.OneOf([
                 A.ShiftScaleRotate(p=0.3),
                 A.GridDistortion(p=0.3),
                 A.ElasticTransform(p=0.3)
             ], p=0.3 if is_fine else 0.5),
             A.OneOf([
-                ColorJitter(p=0.5),
-                RandomBrightnessContrast(p=0.5)
+                A.ColorJitter(p=0.5),
+                A.RandomBrightnessContrast(p=0.5)
             ], p=0.5),
             A.Flip(p=0.5)
         ])
 
-    def __getitem__(self, index, epoch):
+    def __getitem__(self, index):
         video_name = self.data_dic_name_list[index]
         video_clip_num = len(self.data_dic[video_name]['clip_data_list'])
         random_anchor = random.sample(range(video_clip_num), 6)
@@ -86,7 +86,7 @@ class DINetDataset(Dataset):
             reference_frame_path = reference_frame_path_list[reference_random_index]
             reference_frame_data = cv2.imread(reference_frame_path)[:, :, ::-1]
             reference_frame_data = cv2.resize(reference_frame_data, (self.img_w, self.img_h))
-            reference_frame_data = self.reference_transforms(reference_frame_data) / 255.0
+            reference_frame_data = self.reference_transforms(image=reference_frame_data)["image"] / 255.0
             reference_frame_data_list.append(reference_frame_data)
         reference_clip_data = np.concatenate(reference_frame_data_list, 2)
 
